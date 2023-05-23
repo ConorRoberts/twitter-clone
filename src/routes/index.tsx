@@ -1,20 +1,16 @@
-import { component$, useSignal } from "@builder.io/qwik";
+import { component$ } from "@builder.io/qwik";
 import {
-  Form,
+  Link,
   routeLoader$,
   server$,
   type DocumentHead,
 } from "@builder.io/qwik-city";
 import { eq } from "drizzle-orm";
-import { getDatabase, todos, users } from "~/db";
-import {
-  getAuth,
-  useAuthSession,
-  useAuthSignin,
-  useAuthSignout,
-} from "./plugin@auth";
+import { TweetPreview } from "~/components/TweetPreview";
+import { getDatabase, tweets, users } from "~/db";
+import { getAuth } from "./plugin@auth";
 
-export const useTodos = routeLoader$(async (req) => {
+export const useTweets = routeLoader$(async (req) => {
   const db = await getDatabase(req.env);
   const auth = await getAuth(req);
 
@@ -26,16 +22,35 @@ export const useTodos = routeLoader$(async (req) => {
 
   if (!user) return [];
 
-  const items = await db.query.todos.findMany({
+  const data = await db.query.users.findFirst({
+    where: eq(users.email, auth.user.email),
     with: {
-      user: true,
+      follows: {
+        with: {
+          followedUser: {
+            with: {
+              tweets: true,
+            },
+          },
+        },
+      },
     },
   });
 
-  return items;
+  if (!data) return [];
+
+  return data.follows.flatMap((u) =>
+    u.followedUser?.tweets.map((t) => ({
+      author: {
+        id: u.followedUser?.id ?? "",
+        name: u.followedUser?.name ?? "",
+      },
+      tweet: t,
+    }))
+  );
 });
 
-export const createTodo = server$(async function () {
+export const createTweet = server$(async function () {
   const auth = await getAuth(this);
   const db = await getDatabase(this.env);
 
@@ -47,96 +62,39 @@ export const createTodo = server$(async function () {
 
   if (!user) return;
 
-  const newTodo = await db
-    .insert(todos)
-    .values({ title: "Some New Todo", userId: user.id, description: "" })
+  const newTweet = await db
+    .insert(tweets)
+    .values({ content: "Some New Tweet", authorId: user.id })
     .returning()
     .get();
 
-  return { ...newTodo, user };
-});
-
-export const deleteTodo = server$(async function (todoId: number) {
-  const auth = await getAuth(this);
-  const db = await getDatabase(this.env);
-
-  if (!auth?.user) return;
-
-  await db.delete(todos).where(eq(todos.id, todoId)).run();
+  return { ...newTweet, author: user };
 });
 
 export default component$(() => {
-  const signIn = useAuthSignin();
-  const authSession = useAuthSession();
-  const initialItems = useTodos();
-  const items = useSignal(initialItems.value);
-  const signOut = useAuthSignout();
+  const currentTweets = useTweets();
 
   return (
-    <div class="my-16 space-y-8">
-      {authSession.value !== null && (
-        <h1 class="text-3xl text-center font-bold">
-          {authSession.value.user?.name}
-        </h1>
-      )}
-      <div class="flex justify-center gap-2 items-center">
-        {authSession.value === null && (
-          <Form action={signIn}>
-            <input type="hidden" name="providerId" value="github" />
-            <button
-              type="submit"
-              class="bg-gray-100 font-medium text-sm px-4 py-1 transition hover:bg-gray-200 duration-75 rounded-full"
-            >
-              Sign In
-            </button>
-          </Form>
-        )}
-        {authSession.value !== null && (
-          <>
-            <Form action={signOut}>
-              <button
-                type="submit"
-                class="bg-gray-100 font-medium text-sm px-4 py-1 transition hover:bg-gray-200 duration-75 rounded-full"
-              >
-                Sign Out
-              </button>
-            </Form>
-            <button
-              type="submit"
-              class="bg-blue-100 font-medium text-sm px-4 py-1 transition hover:bg-blue-200 duration-75 rounded-full"
-              onClick$={async () => {
-                const newTodo = await createTodo();
-                if (newTodo) {
-                  items.value = [...items.value, newTodo];
-                }
-              }}
-            >
-              Create Todo
-            </button>
-          </>
-        )}
+    <div class="divide-y divide-gray-100">
+      <div class="p-4">
+        <h1 class="font-bold">Home</h1>
       </div>
-
-      {items.value.length > 0 && (
-        <div class="mx-auto max-w-2xl border rounded-xl divide-y overflow-hidden">
-          {items.value.map((t) => (
-            <button
-              key={t.id}
-              onClick$={async () => {
-                await deleteTodo(t.id);
-                items.value = items.value.filter((e) => e.id !== t.id);
-              }}
-              class="py-6 px-8 text-sm hover:bg-gray-50 transition duration-75 w-full h-full text-left"
-            >
-              <p class="font-medium">
-                #{t.id} - {t.title}
-              </p>
-              <p class="text-xs text-gray-600">{t.user?.name}</p>
-            </button>
-          ))}
+      {currentTweets.value.length > 0 && (
+        <div class="flex flex-col divide-y overflow-hidden">
+          {currentTweets.value.map(
+            (t) =>
+              t && (
+                <Link
+                  key={t.tweet.id}
+                  href={`/${t.author.id}/status/${t.tweet.id}`}
+                >
+                  <TweetPreview tweet={t.tweet} author={t.author} />
+                </Link>
+              )
+          )}
         </div>
       )}
-      {items.value.length === 0 && (
+      {currentTweets.value.length === 0 && (
         <p class="font-medium text-sm text-gray-800 text-center my-16">
           No items
         </p>

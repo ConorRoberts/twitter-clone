@@ -23,7 +23,8 @@
     "serve": "wrangler pages dev ./dist",
     "start": "vite --open --mode ssr",
     "up": "drizzle-kit up:sqlite",
-    "qwik": "qwik"
+    "qwik": "qwik",
+    "test.populate": "tsx -r dotenv/config ./src/test/setup/populate.ts"
   },
   "devDependencies": {
     "@auth/core": "^0.7.1",
@@ -31,6 +32,7 @@
     "@builder.io/qwik-auth": "~0.1.0",
     "@builder.io/qwik-city": "^1.1.4",
     "@builder.io/qwik-react": "0.5.0",
+    "@faker-js/faker": "^8.0.1",
     "@types/eslint": "8.37.0",
     "@types/node": "^20.2.3",
     "@types/react": "18.2.5",

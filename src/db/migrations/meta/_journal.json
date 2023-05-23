@@ -5,15 +5,8 @@
     {
       "idx": 0,
       "version": "5",
-      "when": 1684021510178,
-      "tag": "0000_numerous_madrox",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "5",
-      "when": 1684022156882,
-      "tag": "0001_closed_turbo",
+      "when": 1684797659824,
+      "tag": "0000_narrow_stryfe",
       "breakpoints": true
     }
   ]
